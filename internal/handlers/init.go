@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"github.com/go-chi/chi"
+	"github.com/gtngzlv/gophermart/internal/auth"
 	"github.com/gtngzlv/gophermart/internal/config"
 	"github.com/gtngzlv/gophermart/internal/storage"
 	"go.uber.org/zap"
@@ -26,6 +27,7 @@ func NewHandler(cfg *config.AppConfig, log zap.SugaredLogger, m *chi.Mux, s stor
 }
 
 func (h *Handler) init() {
+	h.Router.Use(auth.Authorization)
 	h.Router.Post("/api/user/register", h.Register)
 	h.Router.Post("/api/user/login", h.Login)
 	h.Router.Post("/api/user/orders", h.LoadOrders)

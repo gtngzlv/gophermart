@@ -1,6 +1,9 @@
 package utils
 
-import "golang.org/x/crypto/bcrypt"
+import (
+	"github.com/spf13/viper"
+	"golang.org/x/crypto/bcrypt"
+)
 
 func HashString(s string) (string, error) {
 	hashed, err := bcrypt.GenerateFromPassword([]byte(s), 14)
@@ -12,4 +15,8 @@ func CheckHashAndPassword(hashPassword, password string) bool {
 		return false
 	}
 	return true
+}
+
+func ReturnSecretFromConfig() string {
+	return viper.GetString("secret")
 }

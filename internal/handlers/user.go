@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"github.com/gtngzlv/gophermart/internal/auth"
 	"github.com/gtngzlv/gophermart/internal/errors"
 	"github.com/gtngzlv/gophermart/internal/model"
 	"github.com/gtngzlv/gophermart/internal/utils"
@@ -30,7 +31,11 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
-
+	err = auth.GenerateCookie(w, u.Login)
+	if err != nil {
+		h.log.Errorf("Failed to generate cookie, %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -73,9 +78,23 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
 			}
+			err = auth.GenerateCookie(w, u.Login)
+			if err != nil {
+				h.log.Errorf("Failed to generate cookie, %s", err)
+				w.WriteHeader(http.StatusInternalServerError)
+			}
 			w.WriteHeader(http.StatusOK)
 		}
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
 	}
+}
+
+func (h *Handler) getUserInfoByToken(w http.ResponseWriter, r *http.Request) (model.User, error) {
+	login := auth.GetUserLoginFromToken(w, r)
+	user, err := h.storage.GetUserByLogin(login)
+	if err != nil {
+		return model.User{}, err
+	}
+	return user, nil
 }

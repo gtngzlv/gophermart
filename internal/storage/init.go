@@ -14,7 +14,8 @@ type Storage interface {
 	Login(user model.User) error
 	Register(login, password string) error
 	GetBalance()
-	LoadOrders()
+	GetOrderByNumber(orderNumber string) (model.GetOrdersResponse, error)
+	LoadOrder(orderNumber string, user model.User) error
 	GetOrders()
 	WithdrawLoyalty()
 	GetWithdrawals()
