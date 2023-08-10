@@ -1,10 +1,12 @@
 package auth
 
 import (
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/gtngzlv/gophermart/internal/utils"
 	"net/http"
 	"time"
+
+	"github.com/golang-jwt/jwt/v4"
+
+	"github.com/gtngzlv/gophermart/internal/utils"
 )
 
 func GenerateCookie(w http.ResponseWriter, login string) error {
@@ -19,7 +21,7 @@ func GenerateCookie(w http.ResponseWriter, login string) error {
 		return err
 	}
 	cookie := new(http.Cookie)
-	cookie.Name = cookieName
+	cookie.Name = string(cookieName)
 	cookie.Value = tokenString
 	cookie.Expires = expirationTime.Time
 	http.SetCookie(w, cookie)

@@ -3,9 +3,11 @@ package auth
 import (
 	"context"
 	"errors"
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/gtngzlv/gophermart/internal/utils"
 	"net/http"
+
+	"github.com/golang-jwt/jwt/v4"
+
+	"github.com/gtngzlv/gophermart/internal/utils"
 )
 
 var allowList = map[string]bool{
@@ -13,9 +15,9 @@ var allowList = map[string]bool{
 	"/api/user/login":    true,
 }
 
-var (
-	cookieName = "newcookie"
-)
+type cookie string
+
+const cookieName cookie = "token"
 
 type Claims struct {
 	jwt.RegisteredClaims
@@ -30,7 +32,7 @@ func Authorization(h http.Handler) http.Handler {
 			return
 		}
 
-		cookie, err := r.Cookie(cookieName)
+		cookie, err := r.Cookie(string(cookieName))
 		if err != nil {
 			return
 		}
@@ -50,6 +52,5 @@ func Authorization(h http.Handler) http.Handler {
 
 		ctx := context.WithValue(r.Context(), cookieName, claim)
 		h.ServeHTTP(w, r.WithContext(ctx))
-		return
 	})
 }

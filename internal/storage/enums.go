@@ -1,8 +1,8 @@
 package storage
 
 const (
-	STATUS_NEW        = "NEW"
-	STATUS_PROCESSING = "PROCESSING"
-	STATUS_INVALID    = "INVALID"
-	STATUS_PROCESSED  = "PROCESSED"
+	StatusNew        = "NEW"
+	StatusProcessing = "PROCESSING"
+	StatusInvalid    = "INVALID"
+	StatusProcessed  = "PROCESSED"
 )

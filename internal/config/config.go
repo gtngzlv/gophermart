@@ -3,15 +3,16 @@ package config
 import (
 	"flag"
 	"fmt"
-	"github.com/spf13/viper"
 	"log"
 	"os"
 	"strings"
+
+	"github.com/spf13/viper"
 )
 
 var (
 	RunAddress           = "RUN_ADDRESS"
-	DatabaseAddress      = "DATABASE"
+	DatabaseAddress      = "DATABASE_URI"
 	AccrualSystemAddress = "ACCRUAL_SYSTEM_ADDRESS"
 )
 
@@ -25,9 +26,13 @@ func LoadConfig() *AppConfig {
 	var err error
 	config := &AppConfig{}
 	getArgs(config)
+	log.Print("getArgs config", config)
 	getENVs(config)
+	log.Print("getEnvs config", config)
 	if config.DatabaseAddress == "" {
+		log.Print("db address is empty, going to get default")
 		config.DatabaseAddress, err = returnDefaultDB()
+		log.Print("got default db address", config.DatabaseAddress)
 		if err != nil {
 			log.Fatal("Failed to load default DB connection")
 		}
@@ -38,7 +43,7 @@ func LoadConfig() *AppConfig {
 func getArgs(cfg *AppConfig) {
 	flag.StringVar(&cfg.RunAddress, "a", "localhost:8080", "Application run address")
 	flag.StringVar(&cfg.DatabaseAddress, "d", "", "Database address")
-	flag.StringVar(&cfg.DatabaseAddress, "r", "", "Accrual system address")
+	flag.StringVar(&cfg.AccrualSystemAddress, "r", "localhost:8081", "Accrual system address")
 	flag.Parse()
 }
 
@@ -73,5 +78,6 @@ func returnDefaultDB() (string, error) {
 		viper.GetString("database.name"),
 		viper.GetString("database.password"),
 		viper.GetString("database.sslmode"))
+	log.Print("default connection is", connection)
 	return connection, nil
 }

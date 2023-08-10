@@ -2,12 +2,14 @@ package storage
 
 import (
 	"database/sql"
+	"time"
+
+	"github.com/jackc/pgerrcode"
+	"github.com/lib/pq"
+
 	customErr "github.com/gtngzlv/gophermart/internal/errors"
 	"github.com/gtngzlv/gophermart/internal/model"
 	"github.com/gtngzlv/gophermart/internal/utils"
-	"github.com/jackc/pgerrcode"
-	"github.com/lib/pq"
-	"time"
 )
 
 func (p PostgresDB) GetUserByLogin(login string) (model.User, error) {
@@ -49,9 +51,23 @@ func (p PostgresDB) Register(login, password string) error {
 	return nil
 }
 
-func (p PostgresDB) GetBalance() {
-	//TODO implement me
-	panic("implement me")
+func (p PostgresDB) GetBalance(userID int) (model.GetBalanceResponse, error) {
+	var balance model.GetBalanceResponse
+	query := `SELECT CURRENT_BALANCE, WITHDRAWN FROM BALANCE WHERE USER_ID=$1`
+	res := p.db.QueryRow(query, userID)
+	if res.Err() != nil {
+		return balance, res.Err()
+	}
+	err := res.Scan(&balance.Current, &balance.Withdrawn)
+	if err != nil {
+		switch err {
+		case sql.ErrNoRows:
+			return balance, customErr.ErrNoDBResult
+		default:
+			return balance, err
+		}
+	}
+	return balance, nil
 }
 
 func (p PostgresDB) GetOrderByNumber(orderNumber string) (model.GetOrdersResponse, error) {
@@ -73,16 +89,13 @@ func (p PostgresDB) GetOrderByNumber(orderNumber string) (model.GetOrdersRespons
 			}
 		}
 	}
-	if err != nil {
-		return order, err
-	}
 	return order, nil
 }
 
 func (p PostgresDB) LoadOrder(orderNumber string, user model.User) error {
 	query := `INSERT INTO ORDERS(NUMBER, USER_ID, STATUS, ACCRUAL, UPLOADED_AT) 
 			  VALUES($1, $2, $3, $4, $5)`
-	_, err := p.db.Exec(query, orderNumber, user.ID, STATUS_NEW, 0, time.Now())
+	_, err := p.db.Exec(query, orderNumber, user.ID, StatusNew, 0, time.Now())
 	if err != nil {
 		if pgerrcode.IsIntegrityConstraintViolation(string(err.(*pq.Error).Code)) {
 			return customErr.ErrDuplicateValue
@@ -93,9 +106,36 @@ func (p PostgresDB) LoadOrder(orderNumber string, user model.User) error {
 	return nil
 }
 
-func (p PostgresDB) GetOrders() {
-	//TODO implement me
-	panic("implement me")
+func (p PostgresDB) GetOrdersByUserID(userID int) ([]model.GetOrdersResponse, error) {
+	var (
+		order  model.GetOrdersResponse
+		orders []model.GetOrdersResponse
+		err    error
+	)
+	query := `SELECT NUMBER, STATUS, ACCRUAL, UPLOADED_AT FROM ORDERS WHERE USER_ID=$1`
+	res, err := p.db.Query(query, userID)
+	if res.Err() != nil {
+		return orders, res.Err()
+	}
+	if err != nil {
+		switch err {
+		case sql.ErrNoRows:
+			{
+				return orders, customErr.ErrNoDBResult
+			}
+		default:
+			return orders, err
+		}
+	}
+	for res.Next() {
+		err = res.Scan(&order.Number, &order.Status, &order.Accrual, &order.UploadedAt)
+		if err != nil {
+			return []model.GetOrdersResponse{}, err
+		}
+		order.UploadedAt.Format(time.RFC3339)
+		orders = append(orders, order)
+	}
+	return orders, nil
 }
 
 func (p PostgresDB) WithdrawLoyalty() {

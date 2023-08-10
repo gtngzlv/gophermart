@@ -1,10 +1,13 @@
 package handlers
 
 import (
-	"github.com/ShiraazMoollatjie/goluhn"
-	"github.com/gtngzlv/gophermart/internal/errors"
+	"encoding/json"
 	"io"
 	"net/http"
+
+	"github.com/ShiraazMoollatjie/goluhn"
+
+	"github.com/gtngzlv/gophermart/internal/errors"
 )
 
 func (h *Handler) LoadOrders(w http.ResponseWriter, r *http.Request) {
@@ -58,7 +61,7 @@ func (h *Handler) LoadOrders(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if existingOrder.Number > 0 && existingOrder.UserID != userInfo.ID {
+	if existingOrder.Number != "" && existingOrder.UserID != userInfo.ID {
 		h.log.Infof("Provided order num %s already exist", orderNum)
 		w.WriteHeader(http.StatusConflict)
 		return
@@ -81,5 +84,38 @@ func (h *Handler) LoadOrders(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
+	userInfo, err := h.getUserInfoByToken(w, r)
+	if err != nil {
+		h.log.Errorf("getUserInfoByToken: failed, %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 
+	orders, err := h.storage.GetOrdersByUserID(userInfo.ID)
+	if err != nil {
+		switch err {
+		case errors.ErrNoDBResult:
+			{
+				h.log.Errorf("GetOrdersByUserID: no orders for user with id %s", userInfo.ID)
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+		default:
+			{
+				h.log.Errorf("getUserInfoByToken: failed, %s", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+	resp, err := json.Marshal(orders)
+	if err != nil {
+		h.log.Errorf("GetOrders: failed to marshal resp %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Add("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(resp)
 }

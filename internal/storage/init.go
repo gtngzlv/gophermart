@@ -2,21 +2,23 @@ package storage
 
 import (
 	"database/sql"
-	"github.com/gtngzlv/gophermart/internal/config"
-	"github.com/gtngzlv/gophermart/internal/model"
+
 	_ "github.com/lib/pq"
 	"github.com/pressly/goose"
 	"go.uber.org/zap"
+
+	"github.com/gtngzlv/gophermart/internal/config"
+	"github.com/gtngzlv/gophermart/internal/model"
 )
 
 type Storage interface {
 	GetUserByLogin(login string) (model.User, error)
 	Login(user model.User) error
 	Register(login, password string) error
-	GetBalance()
+	GetBalance(userID int) (model.GetBalanceResponse, error)
 	GetOrderByNumber(orderNumber string) (model.GetOrdersResponse, error)
+	GetOrdersByUserID(userID int) ([]model.GetOrdersResponse, error)
 	LoadOrder(orderNumber string, user model.User) error
-	GetOrders()
 	WithdrawLoyalty()
 	GetWithdrawals()
 }
