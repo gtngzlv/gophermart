@@ -43,7 +43,7 @@ func LoadConfig() *AppConfig {
 func getArgs(cfg *AppConfig) {
 	flag.StringVar(&cfg.RunAddress, "a", "localhost:8080", "Application run address")
 	flag.StringVar(&cfg.DatabaseAddress, "d", "", "Database address")
-	flag.StringVar(&cfg.AccrualSystemAddress, "r", "localhost:8081", "Accrual system address")
+	flag.StringVar(&cfg.AccrualSystemAddress, "r", "http://localhost:8081", "Accrual system address")
 	flag.Parse()
 }
 
@@ -60,7 +60,7 @@ func getENVs(cfg *AppConfig) {
 
 	accrualAddr := strings.TrimSpace(os.Getenv(AccrualSystemAddress))
 	if accrualAddr != "" {
-		cfg.AccrualSystemAddress = AccrualSystemAddress
+		cfg.AccrualSystemAddress = accrualAddr
 	}
 }
 

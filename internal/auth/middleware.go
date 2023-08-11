@@ -17,7 +17,7 @@ var allowList = map[string]bool{
 
 type cookie string
 
-const cookieName cookie = "token"
+const cookieName cookie = "authToken"
 
 type Claims struct {
 	jwt.RegisteredClaims
@@ -34,6 +34,7 @@ func Authorization(h http.Handler) http.Handler {
 
 		cookie, err := r.Cookie(string(cookieName))
 		if err != nil {
+			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
 

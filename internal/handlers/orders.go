@@ -11,6 +11,12 @@ import (
 )
 
 func (h *Handler) LoadOrders(w http.ResponseWriter, r *http.Request) {
+	userInfo, err := h.getUserInfoByToken(w, r)
+	if err != nil {
+		h.log.Errorf("getUserInfoByToken: failed, %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	contentType := r.Header["Content-Type"]
 	if contentType[0] != "text/plain" {
 		h.log.Infof("Received non text/plain")
@@ -26,6 +32,7 @@ func (h *Handler) LoadOrders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	orderNum := string(body)
+	h.log.Info("LoadOrders: order num in body", orderNum)
 
 	if err = goluhn.Validate(orderNum); err != nil {
 		h.log.Info("Provided order num invalid")
@@ -33,12 +40,6 @@ func (h *Handler) LoadOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userInfo, err := h.getUserInfoByToken(w, r)
-	if err != nil {
-		h.log.Errorf("getUserInfoByToken: failed, %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
 	user, err := h.storage.GetUserByLogin(userInfo.Login)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -66,6 +67,8 @@ func (h *Handler) LoadOrders(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusConflict)
 		return
 	}
+
+	// загрузили заказ
 	if err = h.storage.LoadOrder(orderNum, user); err != nil {
 		switch err {
 		case errors.ErrDuplicateValue:
@@ -80,10 +83,12 @@ func (h *Handler) LoadOrders(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	h.log.Info("LoadOrders: saved order with number", orderNum)
 	w.WriteHeader(http.StatusAccepted)
 }
 
 func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
+	w.Header().Add("Content-Type", "application/json")
 	userInfo, err := h.getUserInfoByToken(w, r)
 	if err != nil {
 		h.log.Errorf("getUserInfoByToken: failed, %s", err)
@@ -96,7 +101,7 @@ func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 		switch err {
 		case errors.ErrNoDBResult:
 			{
-				h.log.Errorf("GetOrdersByUserID: no orders for user with id %s", userInfo.ID)
+				h.log.Infof("GetOrdersByUserID: no orders for user with id %s", userInfo.ID)
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
@@ -115,7 +120,6 @@ func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Add("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(resp)
 }

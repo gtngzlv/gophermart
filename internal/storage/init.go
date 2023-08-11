@@ -15,12 +15,15 @@ type Storage interface {
 	GetUserByLogin(login string) (model.User, error)
 	Login(user model.User) error
 	Register(login, password string) error
+
 	GetBalance(userID int) (model.GetBalanceResponse, error)
 	GetOrderByNumber(orderNumber string) (model.GetOrdersResponse, error)
 	GetOrdersByUserID(userID int) ([]model.GetOrdersResponse, error)
 	LoadOrder(orderNumber string, user model.User) error
-	WithdrawLoyalty()
-	GetWithdrawals()
+	WithdrawLoyalty(withdrawal model.WithdrawBalanceRequest, userID int, orderNumber string) error
+	GetWithdrawals(userID int) ([]model.GetWithdrawalsResponse, error)
+	GetOrdersForProcessing(poolSize int) ([]string, error)
+	UpdateOrderState(order *model.GetOrderAccrual) error
 }
 
 type PostgresDB struct {

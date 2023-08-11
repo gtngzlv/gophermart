@@ -29,8 +29,8 @@ func NewHandler(cfg *config.AppConfig, log zap.SugaredLogger, m *chi.Mux, s stor
 }
 
 func (h *Handler) init() {
-	h.Router.Use(auth.Authorization)
 	h.Router.Use(logger.WithLogging)
+	h.Router.Use(auth.Authorization)
 	h.Router.Post("/api/user/register", h.Register)
 	h.Router.Post("/api/user/login", h.Login)
 	h.Router.Post("/api/user/orders", h.LoadOrders)

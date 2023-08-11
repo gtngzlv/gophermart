@@ -1,11 +1,11 @@
 package model
 
 type GetBalanceResponse struct {
-	Current   float64 `json:"current"`
-	Withdrawn int     `json:"withdrawn"`
+	Current   float32 `json:"current"`
+	Withdrawn float32 `json:"withdrawn"`
 }
 
 type WithdrawBalanceRequest struct {
-	Order string `json:"order"`
-	Sum   int    `json:"sum"`
+	Order string  `json:"order"`
+	Sum   float32 `json:"sum"`
 }
