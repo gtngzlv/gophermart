@@ -15,7 +15,7 @@ func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	balance, err := h.storage.GetBalance(userInfo.ID)
+	balance, err := h.repo.GetBalance(userInfo.ID)
 	if err != nil {
 		switch err {
 		case errors.ErrNoDBResult:

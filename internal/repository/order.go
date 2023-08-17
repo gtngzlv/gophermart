@@ -1,4 +1,4 @@
-package storage
+package repository
 
 import (
 	"context"
@@ -8,12 +8,27 @@ import (
 
 	"github.com/jackc/pgerrcode"
 	"github.com/lib/pq"
+	"go.uber.org/zap"
 
 	customErr "github.com/gtngzlv/gophermart/internal/errors"
 	"github.com/gtngzlv/gophermart/internal/model"
 )
 
-func (p PostgresDB) GetOrderByNumber(orderNumber string) (model.GetOrdersResponse, error) {
+type OrderPostgres struct {
+	ctx context.Context
+	db  *sql.DB
+	log zap.SugaredLogger
+}
+
+func NewOrderPostgres(ctx context.Context, db *sql.DB, log zap.SugaredLogger) *OrderPostgres {
+	return &OrderPostgres{
+		ctx: ctx,
+		db:  db,
+		log: log,
+	}
+}
+
+func (p OrderPostgres) GetOrderByNumber(orderNumber string) (*model.GetOrdersResponse, error) {
 	p.log.Info("GetOrderByNumber: provided order num is ", orderNumber)
 	var (
 		order model.GetOrdersResponse
@@ -26,19 +41,19 @@ func (p PostgresDB) GetOrderByNumber(orderNumber string) (model.GetOrdersRespons
 		case sql.ErrNoRows:
 			{
 				p.log.Info("GetOrderByNumber err is", err)
-				return order, customErr.ErrNoDBResult
+				return nil, customErr.ErrNoDBResult
 			}
 		default:
 			{
 				p.log.Info("GetOrderByNumber err is", err)
-				return order, err
+				return nil, err
 			}
 		}
 	}
-	return order, nil
+	return &order, nil
 }
 
-func (p PostgresDB) LoadOrder(orderNumber string, user model.User) error {
+func (p OrderPostgres) LoadOrder(orderNumber string, user model.User) error {
 	queryOrders := `INSERT INTO ORDERS(NUMBER, USER_ID, UPLOADED_AT) 
 			  VALUES($1, $2, $3)`
 	queryAccruals := `INSERT INTO ACCRUALS(ORDER_NUMBER, USER_ID, UPLOADED_AT) VALUES($1, $2, $3)`
@@ -80,10 +95,10 @@ func (p PostgresDB) LoadOrder(orderNumber string, user model.User) error {
 	return tx.Commit()
 }
 
-func (p PostgresDB) GetOrdersByUserID(userID int) ([]model.GetOrdersResponse, error) {
+func (p OrderPostgres) GetOrdersByUserID(userID int) ([]*model.GetOrdersResponse, error) {
 	var (
 		order  model.GetOrdersResponse
-		orders []model.GetOrdersResponse
+		orders []*model.GetOrdersResponse
 		err    error
 	)
 	query := "SELECT order_number, status, amount, uploaded_at from accruals where user_id=$1"
@@ -103,7 +118,7 @@ func (p PostgresDB) GetOrdersByUserID(userID int) ([]model.GetOrdersResponse, er
 		if err != nil {
 			return nil, err
 		}
-		orders = append(orders, order)
+		orders = append(orders, &order)
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
@@ -111,7 +126,7 @@ func (p PostgresDB) GetOrdersByUserID(userID int) ([]model.GetOrdersResponse, er
 	return orders, nil
 }
 
-func (p PostgresDB) GetOrdersForProcessing(poolSize int) ([]string, error) {
+func (p OrderPostgres) GetOrdersForProcessing(poolSize int) ([]string, error) {
 	var orders []string
 	rows, err := p.db.Query(
 		"SELECT order_number FROM accruals WHERE status IN ($1, $2) ORDER BY uploaded_at LIMIT $3", "NEW", "PROCESSING", poolSize,
@@ -134,7 +149,7 @@ func (p PostgresDB) GetOrdersForProcessing(poolSize int) ([]string, error) {
 	return orders, err
 }
 
-func (p PostgresDB) UpdateOrderState(order *model.GetOrderAccrual) error {
+func (p OrderPostgres) UpdateOrderState(order *model.GetOrderAccrual) error {
 	res, err := p.db.Exec(
 		"UPDATE accruals SET status=$1, amount=$2 WHERE order_number = $3",
 		order.Status, order.Accrual, order.Order,

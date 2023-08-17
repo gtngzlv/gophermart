@@ -37,7 +37,7 @@ func (h *Handler) WithdrawLoyalty(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	balance, err := h.storage.GetBalance(userInfo.ID)
+	balance, err := h.repo.GetBalance(userInfo.ID)
 	if err != nil {
 		h.log.Errorf("GetBalance: failed, %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -49,14 +49,14 @@ func (h *Handler) WithdrawLoyalty(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// если нет такого заказа, мы его создаем
-	_, err = h.storage.GetOrderByNumber(withdrawRequest.Order)
+	_, err = h.repo.GetOrderByNumber(withdrawRequest.Order)
 	if err == customErr.ErrNoDBResult {
 		h.log.Infof("WithdrawLoyalty: provided order with num %s not exist, creating", withdrawRequest.Order)
-		h.storage.LoadOrder(withdrawRequest.Order, userInfo)
+		h.repo.LoadOrder(withdrawRequest.Order, userInfo)
 	}
 
 	// cписываем
-	err = h.storage.WithdrawLoyalty(withdrawRequest, userInfo.ID, withdrawRequest.Order)
+	err = h.repo.WithdrawLoyalty(withdrawRequest, userInfo.ID, withdrawRequest.Order)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -75,7 +75,7 @@ func (h *Handler) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	withdrawals, err := h.storage.GetWithdrawals(userInfo.ID)
+	withdrawals, err := h.repo.GetWithdrawals(userInfo.ID)
 	if err != nil {
 		switch err {
 		case customErr.ErrNoDBResult:

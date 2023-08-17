@@ -10,16 +10,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gtngzlv/gophermart/internal/model"
-	"github.com/gtngzlv/gophermart/internal/storage"
-
 	"golang.org/x/time/rate"
+
+	"github.com/gtngzlv/gophermart/internal/model"
+	"github.com/gtngzlv/gophermart/internal/repository"
 )
 
 const tooManyRequestTemplate = "No more than %d requests per minute allowed"
 
-type AccrualClient struct {
-	db       storage.Storage
+type accrualClient struct {
+	db       *repository.Repository
 	host     string
 	endpoint string
 	poolSize int
@@ -30,8 +30,8 @@ type AccrualClient struct {
 
 var wg sync.WaitGroup
 
-func NewAccrualProcessing(db storage.Storage, host string, poolSize int) *AccrualClient {
-	proc := &AccrualClient{
+func NewAccrualProcessing(db *repository.Repository, host string, poolSize int) *accrualClient {
+	proc := &accrualClient{
 		db:         db,
 		host:       host,
 		endpoint:   "/api/orders/",
@@ -44,7 +44,7 @@ func NewAccrualProcessing(db storage.Storage, host string, poolSize int) *Accrua
 	return proc
 }
 
-func (a *AccrualClient) worker() {
+func (a *accrualClient) worker() {
 	for orderID := range a.OrderQueue {
 		if a.limiter != nil && !a.limiter.Allow() {
 			err := a.limiter.Wait(context.Background())
@@ -54,7 +54,7 @@ func (a *AccrualClient) worker() {
 				return
 			}
 		}
-		receivedOrder, err := a.GetOrder(orderID)
+		receivedOrder, err := a.GetOrderByNumber(orderID)
 		if err != nil {
 			log.Println(err)
 		}
@@ -68,7 +68,7 @@ func (a *AccrualClient) worker() {
 	}
 }
 
-func (a *AccrualClient) Run() {
+func (a *accrualClient) Run() {
 	for {
 		orderList, err := a.db.GetOrdersForProcessing(a.poolSize)
 		if err != nil || len(orderList) == 0 {
@@ -83,11 +83,11 @@ func (a *AccrualClient) Run() {
 	}
 }
 
-func (a *AccrualClient) GetOrder(orderNum string) (*model.GetOrderAccrual, error) {
+func (a *accrualClient) GetOrderByNumber(orderNum string) (*model.GetOrderAccrual, error) {
 	res, err := http.Get(a.host + a.endpoint + orderNum)
 	log.Println("getorder endpoint ", a.host+a.endpoint+orderNum)
 	if err != nil {
-		log.Println("GetOrder err http get", err)
+		log.Println("GetOrderByNumber err http get", err)
 		return nil, err
 	}
 	defer res.Body.Close()
@@ -114,12 +114,12 @@ func (a *AccrualClient) GetOrder(orderNum string) (*model.GetOrderAccrual, error
 
 	var orders model.GetOrderAccrual
 	if err = json.NewDecoder(res.Body).Decode(&orders); err != nil {
-		log.Print("GetOrder err", err)
+		log.Print("GetOrderByNumber err", err)
 	}
 	return &orders, nil
 }
 
-func (a *AccrualClient) setLimit(n int) {
+func (a *accrualClient) setLimit(n int) {
 	if n <= 0 {
 		a.limiter = nil
 		return

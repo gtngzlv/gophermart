@@ -29,7 +29,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	err = h.storage.Login(u)
+	err = h.repo.Login(u)
 	if err != nil {
 		h.log.Errorf("Login: incorrect username/password, %s", err)
 		w.WriteHeader(http.StatusUnauthorized)
@@ -62,7 +62,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Посмотрим, что юзера с таким логином нет
-	userInDB, err := h.storage.GetUserByLogin(u.Login)
+	userInDB, err := h.repo.GetUserByLogin(u.Login)
 	switch {
 	case err == nil && userInDB.Login != "":
 		h.log.Infof("Register: user with provided login %s exists", u.Login)
@@ -76,7 +76,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = h.storage.Register(u.Login, cryptedPsw)
+		err = h.repo.Register(u.Login, cryptedPsw)
 		if err != nil {
 			h.log.Errorf("Register: failed while registering in storage")
 			w.WriteHeader(http.StatusInternalServerError)
@@ -98,9 +98,9 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) getUserInfoByToken(w http.ResponseWriter, r *http.Request) (model.User, error) {
 	login := auth.GetUserLoginFromToken(w, r)
-	user, err := h.storage.GetUserByLogin(login)
+	user, err := h.repo.GetUserByLogin(login)
 	if err != nil {
 		return model.User{}, err
 	}
-	return user, nil
+	return *user, nil
 }

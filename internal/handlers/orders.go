@@ -40,14 +40,14 @@ func (h *Handler) LoadOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.storage.GetUserByLogin(userInfo.Login)
+	user, err := h.repo.GetUserByLogin(userInfo.Login)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		h.log.Errorf("LoadOrders: failed to get user by login, %s", err)
 		return
 	}
 
-	existingOrder, err := h.storage.GetOrderByNumber(orderNum)
+	existingOrder, err := h.repo.GetOrderByNumber(orderNum)
 	if err != nil {
 		switch err {
 		case errors.ErrNoDBResult:
@@ -62,14 +62,14 @@ func (h *Handler) LoadOrders(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if existingOrder.Number != "" && existingOrder.UserID != userInfo.ID {
+	if existingOrder != nil && existingOrder.UserID != userInfo.ID {
 		h.log.Infof("Provided order num %s already exist", orderNum)
 		w.WriteHeader(http.StatusConflict)
 		return
 	}
 
 	// загрузили заказ
-	if err = h.storage.LoadOrder(orderNum, user); err != nil {
+	if err = h.repo.LoadOrder(orderNum, *user); err != nil {
 		switch err {
 		case errors.ErrDuplicateValue:
 			{
@@ -96,7 +96,7 @@ func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	orders, err := h.storage.GetOrdersByUserID(userInfo.ID)
+	orders, err := h.repo.GetOrdersByUserID(userInfo.ID)
 	if err != nil {
 		switch err {
 		case errors.ErrNoDBResult:

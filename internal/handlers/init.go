@@ -7,22 +7,22 @@ import (
 	"github.com/gtngzlv/gophermart/internal/auth"
 	"github.com/gtngzlv/gophermart/internal/config"
 	"github.com/gtngzlv/gophermart/internal/logger"
-	"github.com/gtngzlv/gophermart/internal/storage"
+	"github.com/gtngzlv/gophermart/internal/repository"
 )
 
 type Handler struct {
-	Router  *chi.Mux
-	log     zap.SugaredLogger
-	cfg     *config.AppConfig
-	storage storage.Storage
+	Router *chi.Mux
+	log    zap.SugaredLogger
+	cfg    *config.AppConfig
+	repo   *repository.Repository
 }
 
-func NewHandler(cfg *config.AppConfig, log zap.SugaredLogger, m *chi.Mux, s storage.Storage) *Handler {
+func NewHandler(cfg *config.AppConfig, log zap.SugaredLogger, m *chi.Mux, r *repository.Repository) *Handler {
 	h := &Handler{
-		Router:  m,
-		log:     log,
-		cfg:     cfg,
-		storage: s,
+		Router: m,
+		log:    log,
+		cfg:    cfg,
+		repo:   r,
 	}
 	h.init()
 	return h
