@@ -8,7 +8,6 @@ import (
 
 	customErr "github.com/gtngzlv/gophermart/internal/errors"
 	"github.com/gtngzlv/gophermart/internal/model"
-	"github.com/gtngzlv/gophermart/internal/utils"
 )
 
 type UserPostgres struct {
@@ -38,18 +37,6 @@ func (u *UserPostgres) GetUserByLogin(login string) (*model.User, error) {
 	default:
 		return &user, nil
 	}
-}
-
-func (u *UserPostgres) Login(user model.User) error {
-	userInDB, err := u.GetUserByLogin(user.Login)
-	if err != nil {
-		u.log.Errorf("DB Login: failed to get user by login")
-		return err
-	}
-	if !utils.CheckHashAndPassword(userInDB.Password, user.Password) {
-		return err
-	}
-	return nil
 }
 
 func (u *UserPostgres) Register(login, password string) error {

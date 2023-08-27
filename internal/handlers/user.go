@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -13,6 +12,7 @@ import (
 )
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	var u model.User
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		h.log.Errorf("Login: failed to read from body %s", err)
@@ -20,19 +20,21 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var u model.User
-	buf := bytes.NewBuffer(body)
-	decoder := json.NewDecoder(buf)
-	err = decoder.Decode(&u)
+	err = json.Unmarshal(body, &u)
 	if err != nil {
 		h.log.Errorf("Login: failed to unmarshal body %s", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	err = h.repo.Login(u)
-	if err != nil {
-		h.log.Errorf("Login: incorrect username/password, %s", err)
+	userDB, err := h.repo.GetUserByLogin(u.Login)
+	if !utils.CheckHashAndPassword(userDB.Password, u.Password) {
+		h.log.Error(err)
 		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	if err != nil && err != errors.ErrNoDBResult {
+		h.log.Errorf("failed to login, %s", err)
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 	err = auth.GenerateCookie(w, u.Login)
@@ -52,9 +54,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	buf := bytes.NewBuffer(body)
-	decoder := json.NewDecoder(buf)
-	err = decoder.Decode(&u)
+	err = json.Unmarshal(body, &u)
 	if err != nil {
 		h.log.Errorf("Register: failed to unmarshal body %s", err)
 		w.WriteHeader(http.StatusBadRequest)

@@ -9,13 +9,31 @@ import (
 	"github.com/gtngzlv/gophermart/internal/utils"
 )
 
+type (
+	cookie string
+	login  string
+)
+
+const (
+	cookieName  cookie = "authToken"
+	loginCookie login  = "login"
+)
+
+type Claims struct {
+	jwt.RegisteredClaims
+	Login string
+}
+
+func returnNewClaims() Claims {
+	return Claims{}
+}
+
 func GenerateCookie(w http.ResponseWriter, login string) error {
 	secret := utils.ReturnSecretFromConfig()
 	expirationTime := &jwt.NumericDate{Time: time.Now().Add(time.Hour)}
-	claims := Claims{
-		Login: login,
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	claim := returnNewClaims()
+	claim.Login = login
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claim)
 	tokenString, err := token.SignedString([]byte(secret))
 	if err != nil {
 		return err
@@ -29,10 +47,10 @@ func GenerateCookie(w http.ResponseWriter, login string) error {
 }
 
 func GetUserLoginFromToken(w http.ResponseWriter, r *http.Request) string {
-	claim, ok := r.Context().Value(cookieName).(Claims)
+	login, ok := r.Context().Value(loginCookie).(string)
 	if !ok {
 		w.WriteHeader(http.StatusUnauthorized)
 		return ""
 	}
-	return claim.Login
+	return login
 }

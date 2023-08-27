@@ -7,6 +7,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/gtngzlv/gophermart/internal/enums"
 	customErr "github.com/gtngzlv/gophermart/internal/errors"
 	"github.com/gtngzlv/gophermart/internal/model"
 )
@@ -25,9 +26,9 @@ func NewLoyaltyPostgres(ctx context.Context, db *sql.DB, log zap.SugaredLogger) 
 	}
 }
 
-func (p LoyaltyPostgres) WithdrawLoyalty(w model.WithdrawBalanceRequest, userID int, orderNumber string) error {
-	queryUpdateCurrentBalance := `UPDATE ACCRUALS SET AMOUNT=AMOUNT-$1 WHERE USER_ID=$2 AND ORDER_NUMBER=$3`
-	queryUpdateWithdrawal := `UPDATE WITHDRAWALS SET AMOUNT=AMOUNT+$1 WHERE USER_ID=$2 AND ORDER_NUMBER=$3`
+func (p LoyaltyPostgres) DeductPoints(w model.WithdrawBalanceRequest, userID int, orderNumber string) error {
+	queryUpdateCurrentBalance := `UPDATE users SET balance=balance-$1 WHERE ID=$2`
+	queryUpdateWithdrawal := `UPDATE orders SET AMOUNT=$1 WHERE user_id=$2 AND NUMBER=$3 AND OPERATION_TYPE=$4`
 
 	tx, err := p.db.Begin()
 	if err != nil {
@@ -35,14 +36,20 @@ func (p LoyaltyPostgres) WithdrawLoyalty(w model.WithdrawBalanceRequest, userID 
 		p.log.Error("Error while begin tx")
 		return err
 	}
-	_, err = tx.ExecContext(p.ctx, queryUpdateCurrentBalance, w.Sum, userID, orderNumber)
+	_, err = tx.ExecContext(p.ctx, queryUpdateCurrentBalance,
+		w.Sum,
+		userID)
 	if err != nil {
 		p.log.Error("Failed to update current balance")
 		tx.Rollback()
 		return err
 	}
 
-	_, err = tx.ExecContext(p.ctx, queryUpdateWithdrawal, w.Sum, userID, orderNumber)
+	_, err = tx.ExecContext(p.ctx, queryUpdateWithdrawal,
+		w.Sum,
+		userID,
+		orderNumber,
+		enums.Withdrawal)
 	if err != nil {
 		p.log.Error("Failed to update withdrawal")
 		tx.Rollback()
@@ -57,11 +64,11 @@ func (p LoyaltyPostgres) GetWithdrawals(userID int) ([]*model.GetWithdrawalsResp
 		response   []*model.GetWithdrawalsResponse
 		err        error
 	)
-	queryGet := `SELECT ORDER_NUMBER, AMOUNT, PROCESSED_AT 
-			  FROM WITHDRAWALS 
-			  WHERE USER_ID=$1 ORDER BY PROCESSED_AT`
+	queryGet := `SELECT NUMBER, AMOUNT, UPLOADED_AT
+			  FROM ORDERS
+			  WHERE USER_ID=$1 AND OPERATION_TYPE=$2 ORDER BY UPLOADED_AT`
 
-	res, err := p.db.Query(queryGet, userID)
+	res, err := p.db.Query(queryGet, userID, enums.Withdrawal)
 	if res.Err() != nil {
 		return nil, res.Err()
 	}
@@ -84,10 +91,10 @@ func (p LoyaltyPostgres) GetWithdrawals(userID int) ([]*model.GetWithdrawalsResp
 
 func (p LoyaltyPostgres) GetBalance(userID int) (*model.GetBalanceResponse, error) {
 	var balance model.GetBalanceResponse
-	queryAccruals := `SELECT sum(AMOUNT) FROM ACCRUALS WHERE USER_ID=$1`
-	queryWithdrawn := `SELECT sum(AMOUNT) FROM WITHDRAWALS where user_id=$1`
+	current := `SELECT balance FROM users WHERE ID=$1`
+	withdrawn := `SELECT sum(AMOUNT) FROM orders where user_id=$1 and operation_type=$2`
 
-	resAcc := p.db.QueryRow(queryAccruals, userID)
+	resAcc := p.db.QueryRow(current, userID)
 	if resAcc.Err() != nil {
 		return nil, resAcc.Err()
 	}
@@ -101,7 +108,7 @@ func (p LoyaltyPostgres) GetBalance(userID int) (*model.GetBalanceResponse, erro
 		}
 	}
 
-	resWith := p.db.QueryRow(queryWithdrawn, userID)
+	resWith := p.db.QueryRow(withdrawn, userID, enums.Withdrawal)
 	if resWith.Err() != nil {
 		return nil, resWith.Err()
 	}

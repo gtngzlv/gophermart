@@ -10,6 +10,7 @@ import (
 	"github.com/lib/pq"
 	"go.uber.org/zap"
 
+	"github.com/gtngzlv/gophermart/internal/enums"
 	customErr "github.com/gtngzlv/gophermart/internal/errors"
 	"github.com/gtngzlv/gophermart/internal/model"
 )
@@ -54,10 +55,8 @@ func (p OrderPostgres) GetOrderByNumber(orderNumber string) (*model.GetOrdersRes
 }
 
 func (p OrderPostgres) LoadOrder(orderNumber string, user model.User) error {
-	queryOrders := `INSERT INTO ORDERS(NUMBER, USER_ID, UPLOADED_AT) 
-			  VALUES($1, $2, $3)`
-	queryAccruals := `INSERT INTO ACCRUALS(ORDER_NUMBER, USER_ID, UPLOADED_AT) VALUES($1, $2, $3)`
-	queryWithdrawn := `INSERT INTO WITHDRAWALS(ORDER_NUMBER, USER_ID) VALUES($1, $2)`
+	queryAccrual := `INSERT INTO ORDERS(NUMBER, USER_ID, UPLOADED_AT) VALUES($1, $2, $3)`
+	queryWithdrawal := `INSERT INTO ORDERS(NUMBER, USER_ID, UPLOADED_AT, OPERATION_TYPE) VALUES($1, $2, $3, $4)`
 
 	tx, err := p.db.Begin()
 	if err != nil {
@@ -71,7 +70,25 @@ func (p OrderPostgres) LoadOrder(orderNumber string, user model.User) error {
 			}
 		}
 	}()
-	_, err = tx.ExecContext(context.Background(), queryOrders, orderNumber, user.ID, time.Now())
+
+	_, err = tx.Exec(queryAccrual,
+		orderNumber,
+		user.ID,
+		time.Now())
+	if err != nil {
+		if pgerrcode.IsIntegrityConstraintViolation(string(err.(*pq.Error).Code)) {
+			tx.Rollback()
+			return customErr.ErrDuplicateValue
+		}
+		tx.Rollback()
+		return err
+	}
+
+	_, err = tx.Exec(queryWithdrawal,
+		orderNumber,
+		user.ID,
+		time.Now(),
+		enums.Withdrawal)
 	if err != nil {
 		if pgerrcode.IsIntegrityConstraintViolation(string(err.(*pq.Error).Code)) {
 			return customErr.ErrDuplicateValue
@@ -79,19 +96,6 @@ func (p OrderPostgres) LoadOrder(orderNumber string, user model.User) error {
 		p.log.Errorf("DB LoadOrder: failed to exec query insert into orders, %s", err)
 		return err
 	}
-
-	_, err = tx.ExecContext(context.Background(), queryAccruals, orderNumber, user.ID, time.Now())
-	if err != nil {
-		p.log.Errorf("DB LoadOrder: failed to exec query insert into accruals, %s", err)
-		return err
-	}
-
-	_, err = tx.ExecContext(context.Background(), queryWithdrawn, orderNumber, user.ID)
-	if err != nil {
-		p.log.Errorf("DB LoadOrder: failed to exec query insert into withdrawals, %s", err)
-		return err
-	}
-
 	return tx.Commit()
 }
 
@@ -101,8 +105,8 @@ func (p OrderPostgres) GetOrdersByUserID(userID int) ([]*model.GetOrdersResponse
 		orders []*model.GetOrdersResponse
 		err    error
 	)
-	query := "SELECT order_number, status, amount, uploaded_at from accruals where user_id=$1"
-	rows, err := p.db.Query(query, userID)
+	query := "SELECT number, status, amount, uploaded_at from orders where user_id=$1 and  OPERATION_TYPE=$2"
+	rows, err := p.db.Query(query, userID, enums.Accrual)
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +133,11 @@ func (p OrderPostgres) GetOrdersByUserID(userID int) ([]*model.GetOrdersResponse
 func (p OrderPostgres) GetOrdersForProcessing(poolSize int) ([]string, error) {
 	var orders []string
 	rows, err := p.db.Query(
-		"SELECT order_number FROM accruals WHERE status IN ($1, $2) ORDER BY uploaded_at LIMIT $3", "NEW", "PROCESSING", poolSize,
+		"SELECT number FROM orders WHERE status IN ($1, $2) and operation_type=$3 ORDER BY uploaded_at LIMIT $4",
+		enums.StatusNew,
+		enums.StatusProcessing,
+		enums.Accrual,
+		poolSize,
 	)
 	if err != nil {
 		return nil, err
@@ -150,17 +158,37 @@ func (p OrderPostgres) GetOrdersForProcessing(poolSize int) ([]string, error) {
 }
 
 func (p OrderPostgres) UpdateOrderState(order *model.GetOrderAccrual) error {
-	res, err := p.db.Exec(
-		"UPDATE accruals SET status=$1, amount=$2 WHERE order_number = $3",
-		order.Status, order.Accrual, order.Order,
+	tx, err := p.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			txErr := tx.Rollback()
+			if txErr != nil {
+				err = fmt.Errorf("LoadOrder: failed to rollback %s", txErr.Error())
+			}
+		}
+	}()
+
+	_, err = tx.Exec(
+		"UPDATE orders SET status=$1, amount=$2 WHERE number = $3 and operation_type=$4",
+		order.Status,
+		order.Accrual,
+		order.Order,
+		enums.Accrual,
 	)
 	if err != nil {
+		tx.Rollback()
 		return err
 	}
-	rAffected, err := res.RowsAffected()
+
+	_, err = tx.Exec("UPDATE users SET balance=balance+$1 where id=(select distinct user_id from orders where number=$2)",
+		order.Accrual,
+		order.Order)
 	if err != nil {
+		tx.Rollback()
 		return err
 	}
-	p.log.Info("UpdateOrderState affected rows count", rAffected)
-	return err
+	return tx.Commit()
 }

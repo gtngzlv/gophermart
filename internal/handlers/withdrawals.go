@@ -12,18 +12,18 @@ import (
 	"github.com/gtngzlv/gophermart/internal/model"
 )
 
-func (h *Handler) WithdrawLoyalty(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) DeductPoints(w http.ResponseWriter, r *http.Request) {
 	var withdrawRequest model.WithdrawBalanceRequest
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		h.log.Error("WithdrawLoyalty: failed while read body", err)
+		h.log.Error("DeductPoints: failed while read body", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 
 	buf := bytes.NewBuffer(body)
 	err = json.NewDecoder(buf).Decode(&withdrawRequest)
 	if err != nil {
-		h.log.Error("WithdrawLoyalty: failed while decode", err)
+		h.log.Error("DeductPoints: failed while decode", err)
 		w.WriteHeader(http.StatusInternalServerError)
 	}
 	if err = goluhn.Validate(withdrawRequest.Order); err != nil {
@@ -51,12 +51,12 @@ func (h *Handler) WithdrawLoyalty(w http.ResponseWriter, r *http.Request) {
 	// если нет такого заказа, мы его создаем
 	_, err = h.repo.GetOrderByNumber(withdrawRequest.Order)
 	if err == customErr.ErrNoDBResult {
-		h.log.Infof("WithdrawLoyalty: provided order with num %s not exist, creating", withdrawRequest.Order)
+		h.log.Infof("DeductPoints: provided order with num %s not exist, creating", withdrawRequest.Order)
 		h.repo.LoadOrder(withdrawRequest.Order, userInfo)
 	}
 
 	// cписываем
-	err = h.repo.WithdrawLoyalty(withdrawRequest, userInfo.ID, withdrawRequest.Order)
+	err = h.repo.DeductPoints(withdrawRequest, userInfo.ID, withdrawRequest.Order)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return

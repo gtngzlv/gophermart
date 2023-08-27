@@ -11,7 +11,6 @@ import (
 
 type User interface {
 	GetUserByLogin(login string) (*model.User, error)
-	Login(user model.User) error
 	Register(login, password string) error
 }
 
@@ -24,7 +23,7 @@ type Order interface {
 }
 
 type Loyalty interface {
-	WithdrawLoyalty(w model.WithdrawBalanceRequest, userID int, orderNumber string) error
+	DeductPoints(w model.WithdrawBalanceRequest, userID int, orderNumber string) error
 	GetWithdrawals(userID int) ([]*model.GetWithdrawalsResponse, error)
 	GetBalance(userID int) (*model.GetBalanceResponse, error)
 }

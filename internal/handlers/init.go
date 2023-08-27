@@ -4,6 +4,8 @@ import (
 	"github.com/go-chi/chi"
 	"go.uber.org/zap"
 
+	"github.com/go-chi/chi/v5/middleware"
+
 	"github.com/gtngzlv/gophermart/internal/auth"
 	"github.com/gtngzlv/gophermart/internal/config"
 	"github.com/gtngzlv/gophermart/internal/logger"
@@ -30,13 +32,21 @@ func NewHandler(cfg *config.AppConfig, log zap.SugaredLogger, m *chi.Mux, r *rep
 
 func (h *Handler) init() {
 	h.Router.Use(logger.WithLogging)
-	h.Router.Use(auth.Authorization)
+	h.Router.Use(middleware.Compress(5, "text/html",
+		"application/x-gzip",
+		"text/plain",
+		"application/json"))
 	h.Router.Post("/api/user/register", h.Register)
 	h.Router.Post("/api/user/login", h.Login)
-	h.Router.Post("/api/user/orders", h.LoadOrders)
-	h.Router.Post("/api/user/balance/withdraw", h.WithdrawLoyalty)
 
-	h.Router.Get("/api/user/orders", h.GetOrders)
-	h.Router.Get("/api/user/balance", h.GetBalance)
-	h.Router.Get("/api/user/withdrawals", h.GetWithdrawals)
+	h.Router.Group(func(r chi.Router) {
+		r.Use(auth.Authorization)
+		r.Post("/api/user/orders", h.LoadOrders)
+		r.Post("/api/user/balance/withdraw", h.DeductPoints)
+
+		r.Get("/api/user/orders", h.GetOrders)
+		r.Get("/api/user/balance", h.GetBalance)
+		r.Get("/api/user/withdrawals", h.GetWithdrawals)
+	})
+
 }

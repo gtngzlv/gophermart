@@ -40,13 +40,6 @@ func (h *Handler) LoadOrders(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := h.repo.GetUserByLogin(userInfo.Login)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		h.log.Errorf("LoadOrders: failed to get user by login, %s", err)
-		return
-	}
-
 	existingOrder, err := h.repo.GetOrderByNumber(orderNum)
 	if err != nil {
 		switch err {
@@ -62,6 +55,11 @@ func (h *Handler) LoadOrders(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	if existingOrder != nil && existingOrder.UserID == userInfo.ID {
+		h.log.Info("Provided order num %s already loaded with by user", orderNum)
+		w.WriteHeader(200)
+		return
+	}
 	if existingOrder != nil && existingOrder.UserID != userInfo.ID {
 		h.log.Infof("Provided order num %s already exist", orderNum)
 		w.WriteHeader(http.StatusConflict)
@@ -69,19 +67,9 @@ func (h *Handler) LoadOrders(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// загрузили заказ
-	if err = h.repo.LoadOrder(orderNum, *user); err != nil {
-		switch err {
-		case errors.ErrDuplicateValue:
-			{
-				w.WriteHeader(http.StatusOK)
-				return
-			}
-		default:
-			{
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-		}
+	if err = h.repo.LoadOrder(orderNum, userInfo); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
 	}
 	h.log.Info("LoadOrders: saved order with number", orderNum)
 	w.WriteHeader(http.StatusAccepted)

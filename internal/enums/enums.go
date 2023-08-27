@@ -7,3 +7,8 @@ const (
 	StatusInvalid    = "INVALID"
 	StatusProcessed  = "PROCESSED"
 )
+
+const (
+	Withdrawal = "WITHDRAWAL"
+	Accrual    = "ACCRUAL"
+)
