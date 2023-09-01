@@ -133,9 +133,10 @@ func (p OrderPostgres) GetOrdersByUserID(userID int) ([]*model.GetOrdersResponse
 func (p OrderPostgres) GetOrdersForProcessing(poolSize int) ([]string, error) {
 	var orders []string
 	rows, err := p.db.Query(
-		"SELECT number FROM orders WHERE status IN ($1, $2) and operation_type=$3 ORDER BY uploaded_at LIMIT $4",
+		"SELECT number FROM orders WHERE status IN ($1, $2, $3) and operation_type=$4 ORDER BY uploaded_at LIMIT $5",
 		enums.StatusNew,
 		enums.StatusProcessing,
+		enums.StatusRegistered,
 		enums.Accrual,
 		poolSize,
 	)
@@ -157,7 +158,17 @@ func (p OrderPostgres) GetOrdersForProcessing(poolSize int) ([]string, error) {
 	return orders, err
 }
 
-func (p OrderPostgres) UpdateOrderState(order *model.GetOrderAccrual) error {
+func (p OrderPostgres) UpdateOrderStateInvalid(order *model.GetOrderAccrual) error {
+	query := "UPDATE orders set status=$1 where number=$2"
+	_, err := p.db.Exec(query, enums.StatusInvalid, order.Order)
+	if err != nil {
+		p.log.Errorf("UpdateOrderStateInvalid: %s", err)
+		return err
+	}
+	return nil
+}
+
+func (p OrderPostgres) UpdateOrderStateProcessed(order *model.GetOrderAccrual) error {
 	tx, err := p.db.Begin()
 	if err != nil {
 		return err

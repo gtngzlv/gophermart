@@ -19,7 +19,8 @@ type Order interface {
 	LoadOrder(orderNumber string, user model.User) error
 	GetOrdersByUserID(userID int) ([]*model.GetOrdersResponse, error)
 	GetOrdersForProcessing(poolSize int) ([]string, error)
-	UpdateOrderState(order *model.GetOrderAccrual) error
+	UpdateOrderStateProcessed(order *model.GetOrderAccrual) error
+	UpdateOrderStateInvalid(order *model.GetOrderAccrual) error
 }
 
 type Loyalty interface {
