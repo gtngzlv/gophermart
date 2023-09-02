@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS ORDERS(
 );
 
 
+
 -- +goose StatementEnd
 
 -- +goose Down
