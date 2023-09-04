@@ -23,7 +23,7 @@ func Run() error {
 	}
 
 	repos := repository.NewRepository(context.Background(), db, log)
-	accrualClient := client.NewAccrualProcessing(repos, cfg.AccrualSystemAddress, 10)
+	accrualClient := client.NewAccrualClient(repos, cfg.AccrualSystemAddress, 10)
 	go accrualClient.Run()
 
 	h := handlers.NewHandler(cfg, log, router, repos)

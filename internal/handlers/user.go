@@ -12,22 +12,22 @@ import (
 )
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
-	var u model.User
+	var user model.User
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		h.log.Errorf("Login: failed to read from body %s", err)
+		h.log.Errorf("UserID: failed to read from body %s", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	err = json.Unmarshal(body, &u)
+	err = json.Unmarshal(body, &user)
 	if err != nil {
-		h.log.Errorf("Login: failed to unmarshal body %s", err)
+		h.log.Errorf("UserID: failed to unmarshal body %s", err)
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
-	userDB, err := h.repo.GetUserByLogin(u.Login)
-	if !utils.CheckHashAndPassword(userDB.Password, u.Password) {
+	userDB, err := h.repo.GetUserByLogin(user.Login)
+	if !utils.CheckHashAndPassword(userDB.Password, user.Password) {
 		h.log.Error(err)
 		w.WriteHeader(http.StatusUnauthorized)
 		return
@@ -37,7 +37,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
-	err = auth.GenerateCookie(w, u.Login)
+	err = auth.GenerateCookie(w, user.ID)
 	if err != nil {
 		h.log.Errorf("Failed to generate cookie, %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -46,7 +46,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
-	var u model.User
+	var user model.User
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		h.log.Errorf("Register: failed to read from body %s", err)
@@ -54,7 +54,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = json.Unmarshal(body, &u)
+	err = json.Unmarshal(body, &user)
 	if err != nil {
 		h.log.Errorf("Register: failed to unmarshal body %s", err)
 		w.WriteHeader(http.StatusBadRequest)
@@ -62,28 +62,28 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Посмотрим, что юзера с таким логином нет
-	userInDB, err := h.repo.GetUserByLogin(u.Login)
+	userInDB, err := h.repo.GetUserByLogin(user.Login)
 	switch {
 	case err == nil && userInDB.Login != "":
-		h.log.Infof("Register: user with provided login %s exists", u.Login)
+		h.log.Infof("Register: user with provided login %s exists", user.Login)
 		w.WriteHeader(http.StatusConflict)
 		return
 	case err == errors.ErrNoDBResult:
-		cryptedPsw, err := utils.HashString(u.Password)
+		cryptedPsw, err := utils.HashString(user.Password)
 		if err != nil {
 			h.log.Errorf("Register: failed to encrypt password")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		err = h.repo.Register(u.Login, cryptedPsw)
+		userID, err := h.repo.Register(user.Login, cryptedPsw)
 		if err != nil {
 			h.log.Errorf("Register: failed while registering in storage")
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 
-		err = auth.GenerateCookie(w, u.Login)
+		err = auth.GenerateCookie(w, userID)
 		if err != nil {
 			h.log.Errorf("Failed to generate cookie, %s", err)
 			w.WriteHeader(http.StatusInternalServerError)
@@ -94,13 +94,4 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
 	}
-}
-
-func (h *Handler) getUserInfoByToken(w http.ResponseWriter, r *http.Request) (model.User, error) {
-	login := auth.GetUserLoginFromToken(w, r)
-	user, err := h.repo.GetUserByLogin(login)
-	if err != nil {
-		return model.User{}, err
-	}
-	return *user, nil
 }

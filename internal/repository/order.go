@@ -54,7 +54,7 @@ func (p OrderPostgres) GetOrderByNumber(orderNumber string) (*model.GetOrdersRes
 	return &order, nil
 }
 
-func (p OrderPostgres) LoadOrder(orderNumber string, user model.User) error {
+func (p OrderPostgres) LoadOrder(orderNumber string, userID int) error {
 	queryAccrual := `INSERT INTO ORDERS(NUMBER, USER_ID, UPLOADED_AT) VALUES($1, $2, $3)`
 	queryWithdrawal := `INSERT INTO ORDERS(NUMBER, USER_ID, UPLOADED_AT, OPERATION_TYPE) VALUES($1, $2, $3, $4)`
 
@@ -73,7 +73,7 @@ func (p OrderPostgres) LoadOrder(orderNumber string, user model.User) error {
 
 	_, err = tx.Exec(queryAccrual,
 		orderNumber,
-		user.ID,
+		userID,
 		time.Now())
 	if err != nil {
 		if pgerrcode.IsIntegrityConstraintViolation(string(err.(*pq.Error).Code)) {
@@ -86,7 +86,7 @@ func (p OrderPostgres) LoadOrder(orderNumber string, user model.User) error {
 
 	_, err = tx.Exec(queryWithdrawal,
 		orderNumber,
-		user.ID,
+		userID,
 		time.Now(),
 		enums.Withdrawal)
 	if err != nil {

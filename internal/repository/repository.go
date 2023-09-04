@@ -11,12 +11,12 @@ import (
 
 type User interface {
 	GetUserByLogin(login string) (*model.User, error)
-	Register(login, password string) error
+	Register(login, password string) (int, error)
 }
 
 type Order interface {
 	GetOrderByNumber(orderNumber string) (*model.GetOrdersResponse, error)
-	LoadOrder(orderNumber string, user model.User) error
+	LoadOrder(orderNumber string, userID int) error
 	GetOrdersByUserID(userID int) ([]*model.GetOrdersResponse, error)
 	GetOrdersForProcessing(poolSize int) ([]string, error)
 	UpdateOrderStateProcessed(order *model.GetOrderAccrual) error

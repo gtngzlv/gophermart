@@ -11,29 +11,25 @@ import (
 
 type (
 	cookie string
-	login  string
+	user   string
 )
 
 const (
-	cookieName  cookie = "authToken"
-	loginCookie login  = "login"
+	cookieName cookie = "authToken"
+	userID     user   = "userID"
 )
 
 type Claims struct {
 	jwt.RegisteredClaims
-	Login string
+	UserID int
 }
 
-func returnNewClaims() Claims {
-	return Claims{}
-}
-
-func GenerateCookie(w http.ResponseWriter, login string) error {
+func GenerateCookie(w http.ResponseWriter, userID int) error {
 	secret := utils.ReturnSecretFromConfig()
 	expirationTime := &jwt.NumericDate{Time: time.Now().Add(time.Hour)}
-	claim := returnNewClaims()
-	claim.Login = login
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claim)
+	claims := Claims{}
+	claims.UserID = userID
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString([]byte(secret))
 	if err != nil {
 		return err
@@ -46,11 +42,11 @@ func GenerateCookie(w http.ResponseWriter, login string) error {
 	return nil
 }
 
-func GetUserLoginFromToken(w http.ResponseWriter, r *http.Request) string {
-	login, ok := r.Context().Value(loginCookie).(string)
+func GetUserIDFromToken(w http.ResponseWriter, r *http.Request) int {
+	userID, ok := r.Context().Value(userID).(int)
 	if !ok {
 		w.WriteHeader(http.StatusUnauthorized)
-		return ""
+		return 0
 	}
-	return login
+	return userID
 }

@@ -1,19 +1,17 @@
 package client
 
 import (
+	"encoding/json"
+	"errors"
 	"log"
+	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-
-	"github.com/gtngzlv/gophermart/internal/enums"
+	"github.com/gtngzlv/gophermart/internal/model"
 	"github.com/gtngzlv/gophermart/internal/repository"
 )
-
-const tooManyRequestTemplate = "No more than %d requests per minute allowed"
-
-//
 
 type accrualClient struct {
 	db       *repository.Repository
@@ -23,7 +21,7 @@ type accrualClient struct {
 	rw       sync.RWMutex
 }
 
-func NewAccrualProcessing(db *repository.Repository, host string, poolSize int) *accrualClient {
+func NewAccrualClient(db *repository.Repository, host string, poolSize int) *accrualClient {
 	proc := &accrualClient{
 		db:       db,
 		host:     host,
@@ -33,35 +31,44 @@ func NewAccrualProcessing(db *repository.Repository, host string, poolSize int) 
 	return proc
 }
 
-func (a *accrualClient) Run() {
-	var errgr errgroup.Group
-	errgr.SetLimit(a.poolSize)
-	for {
-		orderList, err := a.db.GetOrdersForProcessing(a.poolSize)
-		if err != nil || len(orderList) == 0 {
-			time.Sleep(5 * time.Second)
-			continue
-		}
-		for _, orderID := range orderList {
-			orderID := orderID
-			errgr.Go(func() error {
-				receivedOrder, err := a.GetOrderByNumber(orderID)
-				if err != nil {
-					return err
-				}
-				if receivedOrder != nil {
-					log.Println("received order status ", *receivedOrder)
-					if err = a.db.UpdateOrderStateProcessed(receivedOrder); err != nil {
-						return err
+func (a *accrualClient) GetOrderByNumber(orderNum string) (*model.GetOrderAccrual, error) {
+	a.rw.RLock()
+	res, err := http.Get(a.host + a.endpoint + orderNum)
+	a.rw.RUnlock()
+	log.Println("getorder endpoint ", a.host+a.endpoint+orderNum)
+	if err != nil {
+		log.Println("GetOrderByNumber err http get", err)
+		return nil, err
+	}
+	defer res.Body.Close()
 
-					} else if receivedOrder.Status == enums.StatusInvalid {
-						if err = a.db.UpdateOrderStateInvalid(receivedOrder); err != nil {
-							return err
-						}
-					}
-				}
-				return nil
-			})
+	if res.StatusCode == http.StatusTooManyRequests {
+		b := a.rw.TryLock()
+		if b {
+			duration := returnRetryDuration(res)
+			time.Sleep(time.Second * duration)
+			a.rw.Unlock()
+			return nil, errors.New("429 error code")
 		}
 	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, err
+	}
+
+	var orders model.GetOrderAccrual
+	if err = json.NewDecoder(res.Body).Decode(&orders); err != nil {
+		log.Print("GetOrderByNumber err", err)
+	}
+	return &orders, nil
+}
+
+func returnRetryDuration(r *http.Response) time.Duration {
+	headerParam := "Retry-After"
+	duration := r.Header.Get(headerParam)
+	convertedDuration, err := strconv.Atoi(duration)
+	if err != nil {
+		return 0
+	}
+	return time.Duration(convertedDuration)
 }

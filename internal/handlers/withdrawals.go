@@ -8,11 +8,14 @@ import (
 
 	"github.com/ShiraazMoollatjie/goluhn"
 
+	"github.com/gtngzlv/gophermart/internal/auth"
 	customErr "github.com/gtngzlv/gophermart/internal/errors"
 	"github.com/gtngzlv/gophermart/internal/model"
 )
 
 func (h *Handler) DeductPoints(w http.ResponseWriter, r *http.Request) {
+	userID := auth.GetUserIDFromToken(w, r)
+
 	var withdrawRequest model.WithdrawBalanceRequest
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -31,13 +34,7 @@ func (h *Handler) DeductPoints(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusUnprocessableEntity)
 		return
 	}
-	userInfo, err := h.getUserInfoByToken(w, r)
-	if err != nil {
-		h.log.Errorf("getUserInfoByToken: failed, %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	balance, err := h.repo.GetBalance(userInfo.ID)
+	balance, err := h.repo.GetBalance(userID)
 	if err != nil {
 		h.log.Errorf("GetBalance: failed, %s", err)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -52,11 +49,11 @@ func (h *Handler) DeductPoints(w http.ResponseWriter, r *http.Request) {
 	_, err = h.repo.GetOrderByNumber(withdrawRequest.Order)
 	if err == customErr.ErrNoDBResult {
 		h.log.Infof("DeductPoints: provided order with num %s not exist, creating", withdrawRequest.Order)
-		h.repo.LoadOrder(withdrawRequest.Order, userInfo)
+		h.repo.LoadOrder(withdrawRequest.Order, userID)
 	}
 
 	// cписываем
-	err = h.repo.DeductPoints(withdrawRequest, userInfo.ID, withdrawRequest.Order)
+	err = h.repo.DeductPoints(withdrawRequest, userID, withdrawRequest.Order)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -68,19 +65,14 @@ func (h *Handler) DeductPoints(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	userInfo, err := h.getUserInfoByToken(w, r)
-	if err != nil {
-		h.log.Errorf("getUserInfoByToken: failed, %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	userID := auth.GetUserIDFromToken(w, r)
 
-	withdrawals, err := h.repo.GetWithdrawals(userInfo.ID)
+	withdrawals, err := h.repo.GetWithdrawals(userID)
 	if err != nil {
 		switch err {
 		case customErr.ErrNoDBResult:
 			{
-				h.log.Info("No withdrawals for provided user", userInfo.ID)
+				h.log.Info("No withdrawals for provided user", userID)
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
@@ -93,7 +85,7 @@ func (h *Handler) GetWithdrawals(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	h.log.Infof("%v user withdrawals are %v", userInfo.ID, withdrawals)
+	h.log.Infof("%v user withdrawals are %v", userID, withdrawals)
 	resp, err := json.Marshal(withdrawals)
 	if err != nil {
 		h.log.Error("Failed to marshal get withdrawals", err)

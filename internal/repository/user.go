@@ -39,14 +39,15 @@ func (u *UserPostgres) GetUserByLogin(login string) (*model.User, error) {
 	}
 }
 
-func (u *UserPostgres) Register(login, password string) error {
+func (u *UserPostgres) Register(login, password string) (int, error) {
+	var id int
 	query :=
-		`INSERT INTO USERS(login, password) 
-		VALUES($1, $2);`
-	_, err := u.db.ExecContext(u.ctx, query, login, password)
+		`INSERT INTO USERS(login, password) VALUES($1, $2) RETURNING Users.id;`
+	res := u.db.QueryRowContext(u.ctx, query, login, password)
+	err := res.Scan(&id)
 	if err != nil {
 		u.log.Errorf("DB Register: failed to exec query, %s", err)
-		return err
+		return 0, err
 	}
-	return nil
+	return id, nil
 }

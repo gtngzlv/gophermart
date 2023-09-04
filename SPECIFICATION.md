@@ -47,7 +47,7 @@
 Накопительная система лояльности «Гофермарт» должна предоставлять следующие HTTP-хендлеры:
 
 * `POST /api/user/register` — регистрация пользователя;
-* `POST /api/user/login` — аутентификация пользователя;
+* `POST /api/user/userID` — аутентификация пользователя;
 * `POST /api/user/orders` — загрузка пользователем номера заказа для расчёта;
 * `GET /api/user/orders` — получение списка загруженных пользователем номеров заказов, статусов их обработки и информации о начислениях;
 * `GET /api/user/balance` — получение текущего баланса счёта баллов лояльности пользователя;
@@ -82,7 +82,7 @@ Content-Type: application/json
 ...
 
 {
-	"login": "<login>",
+	"userID": "<userID>",
 	"password": "<password>"
 }
 ```
@@ -96,19 +96,19 @@ Content-Type: application/json
 
 #### **Аутентификация пользователя**
 
-Хендлер: `POST /api/user/login`.
+Хендлер: `POST /api/user/userID`.
 
 Аутентификация производится по паре логин/пароль.
 
 Формат запроса:
 
 ```
-POST /api/user/login HTTP/1.1
+POST /api/user/userID HTTP/1.1
 Content-Type: application/json
 ...
 
 {
-	"login": "<login>",
+	"userID": "<userID>",
 	"password": "<password>"
 }
 ```

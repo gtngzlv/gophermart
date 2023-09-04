@@ -21,15 +21,15 @@ func Authorization(h http.Handler) http.Handler {
 
 		token := cookie.Value
 
-		claim := returnNewClaims()
-		parsedTokenInfo, err := jwt.ParseWithClaims(token, &claim, func(token *jwt.Token) (interface{}, error) {
+		claims := Claims{}
+		parsedTokenInfo, err := jwt.ParseWithClaims(token, &claims, func(token *jwt.Token) (interface{}, error) {
 			return []byte(secret), nil
 		})
 		if err != nil || !parsedTokenInfo.Valid {
 			w.WriteHeader(http.StatusUnauthorized)
 		}
 
-		ctx := context.WithValue(r.Context(), loginCookie, claim.Login)
+		ctx := context.WithValue(r.Context(), userID, claims.UserID)
 		h.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

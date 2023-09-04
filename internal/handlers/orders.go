@@ -7,16 +7,12 @@ import (
 
 	"github.com/ShiraazMoollatjie/goluhn"
 
+	"github.com/gtngzlv/gophermart/internal/auth"
 	"github.com/gtngzlv/gophermart/internal/errors"
 )
 
 func (h *Handler) LoadOrders(w http.ResponseWriter, r *http.Request) {
-	userInfo, err := h.getUserInfoByToken(w, r)
-	if err != nil {
-		h.log.Errorf("getUserInfoByToken: failed, %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	userID := auth.GetUserIDFromToken(w, r)
 	contentType := r.Header["Content-Type"]
 	if contentType[0] != "text/plain" {
 		h.log.Infof("Received non text/plain")
@@ -55,19 +51,19 @@ func (h *Handler) LoadOrders(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if existingOrder != nil && existingOrder.UserID == userInfo.ID {
+	if existingOrder != nil && existingOrder.UserID == userID {
 		h.log.Info("Provided order num %s already loaded with by user", orderNum)
 		w.WriteHeader(200)
 		return
 	}
-	if existingOrder != nil && existingOrder.UserID != userInfo.ID {
+	if existingOrder != nil && existingOrder.UserID != userID {
 		h.log.Infof("Provided order num %s already exist", orderNum)
 		w.WriteHeader(http.StatusConflict)
 		return
 	}
 
 	// загрузили заказ
-	if err = h.repo.LoadOrder(orderNum, userInfo); err != nil {
+	if err = h.repo.LoadOrder(orderNum, userID); err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
@@ -77,19 +73,14 @@ func (h *Handler) LoadOrders(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) GetOrders(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Content-Type", "application/json")
-	userInfo, err := h.getUserInfoByToken(w, r)
-	if err != nil {
-		h.log.Errorf("getUserInfoByToken: failed, %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	userID := auth.GetUserIDFromToken(w, r)
 
-	orders, err := h.repo.GetOrdersByUserID(userInfo.ID)
+	orders, err := h.repo.GetOrdersByUserID(userID)
 	if err != nil {
 		switch err {
 		case errors.ErrNoDBResult:
 			{
-				h.log.Infof("GetOrdersByUserID: no orders for user with id %s", userInfo.ID)
+				h.log.Infof("GetOrdersByUserID: no orders for user with id %s", userID)
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}

@@ -4,23 +4,19 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/gtngzlv/gophermart/internal/auth"
 	"github.com/gtngzlv/gophermart/internal/errors"
 )
 
 func (h *Handler) GetBalance(w http.ResponseWriter, r *http.Request) {
-	userInfo, err := h.getUserInfoByToken(w, r)
-	if err != nil {
-		h.log.Errorf("getUserInfoByToken: failed, %s", err)
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
+	userID := auth.GetUserIDFromToken(w, r)
 
-	balance, err := h.repo.GetBalance(userInfo.ID)
+	balance, err := h.repo.GetBalance(userID)
 	if err != nil {
 		switch err {
 		case errors.ErrNoDBResult:
 			{
-				h.log.Info("GetBalance: no balance for provided userID", userInfo.ID)
+				h.log.Info("GetBalance: no balance for provided userID", userID)
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
