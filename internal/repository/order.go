@@ -185,10 +185,7 @@ func (p OrderPostgres) UpdateOrderStateProcessed(order *model.GetOrderAccrual) e
 	var status string
 	res := tx.QueryRow("SELECT status FROM orders WHERE number=$1 FOR UPDATE", order.Order)
 	err = res.Scan(&status)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
+
 	if status == enums.StatusProcessed {
 		tx.Commit()
 		return nil
@@ -201,17 +198,9 @@ func (p OrderPostgres) UpdateOrderStateProcessed(order *model.GetOrderAccrual) e
 		order.Order,
 		enums.Accrual,
 	)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
 
 	_, err = tx.Exec("UPDATE users SET balance=(select sum(amount) from orders where status=$1) WHERE id=(select distinct user_id from orders where number=$2)",
 		enums.StatusProcessed,
 		order.Order)
-	if err != nil {
-		tx.Rollback()
-		return err
-	}
 	return tx.Commit()
 }

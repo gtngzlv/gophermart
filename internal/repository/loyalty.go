@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -32,29 +33,25 @@ func (p LoyaltyPostgres) DeductPoints(w model.WithdrawBalanceRequest, userID int
 
 	tx, err := p.db.Begin()
 	if err != nil {
-		tx.Rollback()
-		p.log.Error("Error while begin tx")
 		return err
 	}
+	defer func() {
+		if err != nil {
+			txErr := tx.Rollback()
+			if txErr != nil {
+				err = fmt.Errorf("LoadOrder: failed to rollback %s", txErr.Error())
+			}
+		}
+	}()
 	_, err = tx.ExecContext(p.ctx, queryUpdateCurrentBalance,
 		w.Sum,
 		userID)
-	if err != nil {
-		p.log.Error("Failed to update current balance")
-		tx.Rollback()
-		return err
-	}
 
 	_, err = tx.ExecContext(p.ctx, queryUpdateWithdrawal,
 		w.Sum,
 		userID,
 		orderNumber,
 		enums.Withdrawal)
-	if err != nil {
-		p.log.Error("Failed to update withdrawal")
-		tx.Rollback()
-		return err
-	}
 	return tx.Commit()
 }
 
