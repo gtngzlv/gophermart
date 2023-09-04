@@ -199,13 +199,7 @@ func (p OrderPostgres) UpdateOrderStateProcessed(order *model.GetOrderAccrual) e
 		enums.Accrual,
 	)
 
-	var userID int
-	res = tx.QueryRow("SELECT user_id from orders where number=$1", order.Order)
-	err = res.Scan(&userID)
-
-	_, err = tx.Exec(`UPDATE users SET balance=(select sum(amount) from orders where status=$1 and user_id=$2) 
-		 - (select sum(amount) from orders where operation_type=$3 and user_id=$2)
-		WHERE id=$2`,
+	_, err = tx.Exec("UPDATE users SET balance=(select sum(amount) from orders where status=$1) WHERE id=(select distinct user_id from orders where number=$2)",
 		enums.StatusProcessed,
 		order.Order)
 	return tx.Commit()
