@@ -51,10 +51,9 @@ func (a *accrualClient) Run() {
 				}
 				if receivedOrder != nil {
 					log.Println("received order status ", *receivedOrder)
-					if receivedOrder.Status == enums.StatusProcessed {
-						if err = a.db.UpdateOrderStateProcessed(receivedOrder); err != nil {
-							return err
-						}
+					if err = a.db.UpdateOrderStateProcessed(receivedOrder); err != nil {
+						return err
+
 					} else if receivedOrder.Status == enums.StatusInvalid {
 						if err = a.db.UpdateOrderStateInvalid(receivedOrder); err != nil {
 							return err
