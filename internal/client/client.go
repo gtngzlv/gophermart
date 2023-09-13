@@ -19,6 +19,7 @@ type accrualClient struct {
 	endpoint string
 	poolSize int
 	rw       sync.RWMutex
+	m        sync.Mutex
 }
 
 func NewAccrualClient(db *repository.Repository, host string, poolSize int) *accrualClient {
@@ -33,9 +34,9 @@ func NewAccrualClient(db *repository.Repository, host string, poolSize int) *acc
 
 func (a *accrualClient) GetOrderByNumber(orderNum string) (*model.GetOrderAccrual, error) {
 	a.rw.RLock()
+	defer a.rw.RUnlock()
+
 	res, err := http.Get(a.host + a.endpoint + orderNum)
-	a.rw.RUnlock()
-	log.Println("getorder endpoint ", a.host+a.endpoint+orderNum)
 	if err != nil {
 		log.Println("GetOrderByNumber err http get", err)
 		return nil, err
@@ -43,22 +44,27 @@ func (a *accrualClient) GetOrderByNumber(orderNum string) (*model.GetOrderAccrua
 	defer res.Body.Close()
 
 	if res.StatusCode == http.StatusTooManyRequests {
-		b := a.rw.TryLock()
-		if b {
+		lock := a.m.TryLock()
+		if lock {
+			a.rw.Lock()
 			duration := returnRetryDuration(res)
-			time.Sleep(time.Second * duration)
-			a.rw.Unlock()
-			return nil, errors.New("429 error code")
+			go func() {
+				time.Sleep(time.Second * duration)
+				a.rw.Unlock()
+				a.m.Unlock()
+			}()
 		}
+		return nil, errors.New("429 error code")
 	}
 
 	if res.StatusCode != http.StatusOK {
-		return nil, err
+		return nil, errors.New("non-200 status code")
 	}
 
 	var orders model.GetOrderAccrual
-	if err = json.NewDecoder(res.Body).Decode(&orders); err != nil {
+	if err := json.NewDecoder(res.Body).Decode(&orders); err != nil {
 		log.Print("GetOrderByNumber err", err)
+		return nil, err
 	}
 	return &orders, nil
 }
