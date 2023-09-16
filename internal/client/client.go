@@ -48,8 +48,10 @@ func (a *accrualClient) GetOrderByNumber(orderNum string) (*model.GetOrderAccrua
 		if lock {
 			a.rw.Lock()
 			duration := returnRetryDuration(res)
+			currentTime := time.Now()
+			wakeUpTime := currentTime.Add(duration * time.Second)
 			go func() {
-				time.Sleep(time.Second * duration)
+				time.Sleep(time.Until(wakeUpTime))
 				a.rw.Unlock()
 				a.m.Unlock()
 			}()
